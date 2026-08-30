@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <title>Shobo Mozumder | 3D Solar System Portfolio</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        screens: {
+          'xs': '475px',
+          'sm': '640px',
+          'md': '768px',
+          'lg': '1024px',
+          'xl': '1280px',
+          '2xl': '1536px',
+        },
+        extend: {
+          colors: {
+            space: {
+              dark: '#030712',
+              card: 'rgba(15, 23, 42, 0.75)',
+              border: 'rgba(56, 189, 248, 0.15)'
+            }
+          },
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            mono: ['Fira Code', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Three.js and OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+      scrollbar-width: thin;
+      scrollbar-color: #0284c7 #030712;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #030712;
+      color: #f3f4f6;
+      font-family: 'Outfit', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    #webgl-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 0;
+    }
+
+    /* Glassmorphism Panel */
+    .glass-panel {
+      background: rgba(11, 17, 32, 0.82);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+      box-shadow: 0 12px 40px -10px rgba(0, 0, 0, 0.7);
+    }
+
+    .glass-card {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(56, 189, 248, 0.15);
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .glass-card:hover {
+      border-color: rgba(56, 189, 248, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px -5px rgba(6, 182, 212, 0.25);
+    }
+
+    /* 3D Planet Floating Labels Container */
+    #planet-labels-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 10;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .planet-badge {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      background: rgba(11, 17, 32, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      color: #e2e8f0;
+      font-size: 11px;
+      font-weight: 700;
+      font-family: 'Fira Code', monospace;
+      white-space: nowrap;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+      transform: translate(-50%, -100%);
+      pointer-events: auto;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      will-change: transform, opacity;
+    }
+
+    .planet-badge:hover {
+      background: rgba(6, 182, 212, 0.35);
+      border-color: #ffffff;
+      color: #ffffff;
+      box-shadow: 0 0 25px rgba(56, 189, 248, 0.8);
+      transform: translate(-50%, -115%) scale(1.08);
+    }
+
+    .planet-badge.active-target {
+      background: rgba(168, 85, 247, 0.6) !important;
+      border-color: #a855f7 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 30px rgba(168, 85, 247, 0.9) !important;
+    }
+
+    /* Side Content Drawer Scrollbar */
+    #info-drawer::-webkit-scrollbar {
+      width: 6px;
+    }
+    #info-drawer::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.5);
+    }
+    #info-drawer::-webkit-scrollbar-thumb {
+      background: #0284c7;
+      border-radius: 3px;
+    }
+
+    /* Terminal Output */
+    .terminal-box {
+      background: rgba(3, 7, 18, 0.92);
+      font-family: 'Fira Code', monospace;
+      border: 1px solid rgba(56, 189, 248, 0.25);
+    }
+  </style>
+</head>
+<body class="selection:bg-cyan-500 selection:text-black">
+
+  <!-- 3D WebGL Canvas Container -->
+  <div id="webgl-container"></div>
+
+  <!-- Dynamic 3D Planet Tag Labels -->
+  <div id="planet-labels-overlay"></div>
+
+  <!-- HEADER NAVIGATION -->
+  <header class="fixed top-0 left-0 w-full z-30 transition-all duration-300 pointer-events-none">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3">
+      <div class="glass-panel rounded-2xl px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between pointer-events-auto">
+        
+        <!-- Brand Logo -->
+        <a href="javascript:void(0)" onclick="selectCelestialBody('sun')" class="flex items-center space-x-3 group">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-cyan-500 to-indigo-600 flex items-center justify-center font-extrabold text-white shadow-lg shadow-amber-500/20 group-hover:scale-105 transition-transform text-xs sm:text-base">
+            SM
+          </div>
+          <span class="text-base sm:text-lg font-black tracking-tight text-white group-hover:text-amber-400 transition-colors">
+            Solar<span class="text-cyan-400">.Portfolio</span>
+          </span>
+        </a>
+
+        <!-- Desktop Quick Planet Nav -->
+        <nav class="hidden lg:flex items-center space-x-1 font-mono text-xs font-semibold text-slate-300">
+          <button onclick="selectCelestialBody('sun')" class="px-2.5 py-1.5 rounded-lg hover:text-amber-400 hover:bg-amber-500/10 transition-all">☀️ Sun</button>
+          <button onclick="selectCelestialBody('mercury')" class="px-2.5 py-1.5 rounded-lg hover:text-cyan-400 hover:bg-cyan-500/10 transition-all">☿ About</button>
+          <button onclick="selectCelestialBody('venus')" class="px-2.5 py-1.5 rounded-lg hover:text-amber-300 hover:bg-amber-500/10 transition-all">♀ Skills</button>
+          <button onclick="selectCelestialBody('earth')" class="px-2.5 py-1.5 rounded-lg hover:text-blue-400 hover:bg-blue-500/10 transition-all">🌍 Info</button>
+          <button onclick="selectCelestialBody('moon')" class="px-2.5 py-1.5 rounded-lg hover:text-slate-200 hover:bg-slate-500/10 transition-all">🌙 Experience</button>
+          <button onclick="selectCelestialBody('mars')" class="px-2.5 py-1.5 rounded-lg hover:text-red-400 hover:bg-red-500/10 transition-all">♂ Projects</button>
+          <button onclick="selectCelestialBody('jupiter')" class="px-2.5 py-1.5 rounded-lg hover:text-purple-400 hover:bg-purple-500/10 transition-all">♃ Contact & Edu</button>
+        </nav>
+
+        <!-- Orbit Reset Action -->
+        <div class="flex items-center space-x-2">
+          <button id="reset-orbit-btn" class="px-3.5 py-1.5 text-xs font-mono font-bold uppercase tracking-wider bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-xl transition-all shadow-lg flex items-center gap-1.5">
+            <i class="fa-solid fa-arrows-spin"></i>
+            <span class="hidden sm:inline">Orbit View</span>
+          </button>
+          
+          <button id="mobile-menu-btn" aria-label="Toggle Menu" class="lg:hidden text-slate-300 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition-colors">
+            <i class="fa-solid fa-bars text-lg"></i>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Quick Jump -->
+    <div id="mobile-menu" class="hidden lg:hidden px-3 sm:px-6 pt-1 pb-4 pointer-events-auto">
+      <div class="glass-panel rounded-2xl p-3 grid grid-cols-2 xs:grid-cols-3 gap-2 text-center text-xs font-mono font-bold text-slate-200">
+        <button onclick="selectCelestialBody('sun'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-400">☀️ Sun (Home)</button>
+        <button onclick="selectCelestialBody('mercury'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300">☿ Mercury (About)</button>
+        <button onclick="selectCelestialBody('venus'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-amber-300">♀ Venus (Skills)</button>
+        <button onclick="selectCelestialBody('earth'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-blue-400">🌍 Earth (Info)</button>
+        <button onclick="selectCelestialBody('moon'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200">🌙 Moon (Experience)</button>
+        <button onclick="selectCelestialBody('mars'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-red-400">♂ Mars (Projects)</button>
+        <button onclick="selectCelestialBody('jupiter'); toggleMobileMenu()" class="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-purple-400 col-span-2 xs:col-span-1">♃ Jupiter (Contact)</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SIDE OVERLAY DRAWER FOR PLANET PAGE CONTENT -->
+  <aside id="info-drawer" class="fixed top-0 right-0 h-full w-full sm:w-[500px] md:w-[600px] lg:w-[650px] glass-panel z-40 transform translate-x-full transition-transform duration-500 ease-out p-6 sm:p-8 overflow-y-auto pointer-events-auto">
+    <button id="close-drawer-btn" aria-label="Close details" class="absolute top-5 right-5 w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors">
+      <i class="fa-solid fa-xmark text-lg"></i>
+    </button>
+    
+    <div id="drawer-content">
+      <!-- Dynamic Section Page Inserted by JS -->
+    </div>
+  </aside>
+
+  <!-- MODAL FOR PROJECT DETAILS -->
+  <div id="project-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div class="glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 relative max-h-[85vh] overflow-y-auto pointer-events-auto">
+      <button onclick="closeProjectModal()" aria-label="Close modal" class="absolute top-5 right-5 w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- THREE.JS SOLAR SYSTEM ENGINE & PAGE DATA -->
+  <script>
+    /* =========================================================
+       1. PORTFOLIO DATA (7 Celestial Bodies = 7 Pages)
+       ========================================================= */
+    const portfolioPages = {
+      sun: {
+        badge: "☀️ Core / Home",
+        title: "Shobo Mozumder",
+        subtitle: "Software Engineer & ASP.NET Core Specialist",
+        color: "text-amber-400",
+        bgBadge: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold tracking-wider uppercase">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+              The Solar System Core • Shobo Mozumder
+            </div>
+
+            <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+              Shobo <span class="text-amber-400">Mozumder</span>
+            </h1>
+
+            <p class="text-base sm:text-xl font-bold text-slate-200">
+              Software Engineer | Microservices & Architecture Aspirant
+            </p>
+
+            <p class="text-slate-300 text-xs sm:text-sm leading-relaxed">
+              Over <strong>4+ years of professional software engineering experience</strong> building robust web applications, enterprise ERPs, RESTful APIs, and cloud-backed systems with ASP.NET Core, C#, Entity Framework Core, SQL Server, Oracle, and AWS.
+            </p>
+
+            <!-- Quick Action Buttons -->
+            <div class="grid grid-cols-2 gap-3 pt-2">
+              <button onclick="selectCelestialBody('mars')" class="px-4 py-3 rounded-xl bg-gradient-to-r from-red-500 to-amber-600 text-white font-bold text-xs shadow-lg flex items-center justify-center gap-2">
+                <i class="fa-solid fa-diagram-project"></i> 3 Core Projects
+              </button>
+              <button onclick="selectCelestialBody('moon')" class="px-4 py-3 rounded-xl glass-card text-slate-200 font-bold text-xs flex items-center justify-center gap-2 hover:border-cyan-400">
+                <i class="fa-solid fa-briefcase text-cyan-400"></i> Work Experience
+              </button>
+            </div>
+
+            <!-- Terminal CLI -->
+            <div class="pt-2">
+              <div class="terminal-box rounded-2xl p-4 text-xs text-cyan-400 space-y-2">
+                <div class="flex items-center justify-between border-b border-slate-800 pb-2 text-[10px] text-slate-400">
+                  <span class="flex items-center gap-2 font-mono">
+                    <span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>
+                    <span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>
+                    shobo-solar-cli v3.0
+                  </span>
+                  <span>type 'help'</span>
+                </div>
+                <div id="terminal-output" class="text-slate-300 font-mono text-[11px] leading-relaxed max-h-24 overflow-y-auto space-y-1">
+                  <div><span class="text-amber-400">system:</span> Welcome to Shobo Mozumder's 3D Solar Portfolio.</div>
+                  <div><span class="text-amber-400">nav:</span> Click any orbiting planet to travel to that section page.</div>
+                </div>
+                <form onsubmit="handleTerminalCommand(event)" class="flex items-center gap-2 pt-1 font-mono">
+                  <span class="text-amber-400">$</span>
+                  <input type="text" id="terminal-input" placeholder="try: skills, projects, contact, clear..." class="bg-transparent text-white focus:outline-none w-full text-xs placeholder-slate-600">
+                </form>
+              </div>
+            </div>
+
+            <!-- Direct Contact Footer -->
+            <div class="pt-2 border-t border-slate-800/80 flex flex-wrap gap-4 text-xs text-slate-400 font-mono">
+              <div><i class="fa-solid fa-envelope text-amber-400 mr-2"></i>shuvomozumder101@gmail.com</div>
+              <div><i class="fa-solid fa-phone text-amber-400 mr-2"></i>+8801640703380</div>
+            </div>
+          </div>
+        `
+      },
+
+      mercury: {
+        badge: "☿ Planet 1 • About Me",
+        title: "About & Career Vision",
+        subtitle: "Results-Driven Software Developer",
+        color: "text-slate-300",
+        bgBadge: "bg-slate-500/10 text-slate-300 border-slate-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-user-gear text-xs"></i> Mercury Orbit • Career Vision
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Architecting Efficient, Secure & Maintainable Web Systems
+            </h2>
+
+            <div class="glass-card p-6 rounded-2xl space-y-4 text-slate-300 text-xs sm:text-sm leading-relaxed">
+              <p>
+                I am a passionate and results-driven software developer specializing in web application development using <strong class="text-cyan-300">ASP.NET Core</strong> and modern technologies. Skilled in designing scalable architectures, developing high-performance RESTful APIs, and implementing cloud-based solutions.
+              </p>
+              <p>
+                I actively stay current with emerging software trends and best practices to enhance my technical expertise. Focused on building efficient, secure, and maintainable web systems, with a strong ambition to grow into a <strong class="text-indigo-300">Software Architect</strong> role specializing in microservices and distributed systems.
+              </p>
+            </div>
+
+            <!-- Stat Matrix -->
+            <div class="grid grid-cols-3 gap-3">
+              <div class="glass-card p-4 rounded-xl text-center">
+                <div class="text-2xl sm:text-3xl font-black text-cyan-400">4+</div>
+                <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Years Experience</div>
+              </div>
+              <div class="glass-card p-4 rounded-xl text-center">
+                <div class="text-2xl sm:text-3xl font-black text-amber-400">3</div>
+                <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Enterprise Systems</div>
+              </div>
+              <div class="glass-card p-4 rounded-xl text-center">
+                <div class="text-2xl sm:text-3xl font-black text-emerald-400">100%</div>
+                <div class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Clean Code</div>
+              </div>
+            </div>
+
+            <button onclick="selectCelestialBody('venus')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-2">
+              <span>Next Planet: Skills & Tech Stack</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        `
+      },
+
+      venus: {
+        badge: "♀ Planet 2 • Technical Skills",
+        title: "Skills & Technology Matrix",
+        subtitle: "Full-Stack ASP.NET Core Arsenal",
+        color: "text-amber-300",
+        bgBadge: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-950/80 border border-amber-500/30 text-amber-300 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-code text-xs"></i> Venus Orbit • Tech Stack
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Technical Expertise
+            </h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div class="glass-card p-4 rounded-xl">
+                <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-code"></i> Languages & Frameworks
+                </h3>
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-amber-300 border border-slate-700">C#</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-amber-300 border border-slate-700">ASP.NET Core MVC</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-amber-300 border border-slate-700">Entity Framework Core</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">React</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">C</span>
+                </div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl">
+                <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-database"></i> Databases & SQL
+                </h3>
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-cyan-300 border border-slate-700">SQL Server</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-cyan-300 border border-slate-700">Oracle DB</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-cyan-300 border border-slate-700">MySQL</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-cyan-300 border border-slate-700">Stored Procedures</span>
+                </div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl">
+                <h3 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-cloud"></i> Cloud & DevOps
+                </h3>
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-purple-300 border border-slate-700">AWS (EC2, S3)</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-purple-300 border border-slate-700">Docker</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">Git / GitHub / GitLab</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">Git-flow</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">Scrum / Trello</span>
+                </div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl">
+                <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                  <i class="fa-solid fa-sitemap"></i> Architecture & Frontend
+                </h3>
+                <div class="flex flex-wrap gap-1.5">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-emerald-300 border border-slate-700">OOP</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-emerald-300 border border-slate-700">Design Patterns</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-emerald-300 border border-slate-700">Dependency Injection</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">HTML / Bootstrap</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">jQuery / Ajax</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">RDLC Reports</span>
+                  <span class="px-2.5 py-1 rounded-md text-xs font-mono bg-slate-800 text-slate-300 border border-slate-700">SignalR WebSockets</span>
+                </div>
+              </div>
+
+            </div>
+
+            <button onclick="selectCelestialBody('earth')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-2">
+              <span>Next Planet: Earth Profile & Info</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        `
+      },
+
+      earth: {
+        badge: "🌍 Planet 3 • Profile & Info",
+        title: "Information & Profile Overview",
+        subtitle: "Location, Contact & Core Values",
+        color: "text-blue-400",
+        bgBadge: "bg-blue-500/10 text-blue-400 border-blue-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-950/80 border border-blue-500/30 text-blue-400 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-earth-americas text-xs"></i> Earth Orbit • Profile Info
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Software Engineer Overview
+            </h2>
+
+            <div class="space-y-3">
+              <div class="glass-card p-4 rounded-xl flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400 text-lg shrink-0">
+                  <i class="fa-solid fa-location-dot"></i>
+                </div>
+                <div>
+                  <div class="text-[10px] text-slate-400 uppercase tracking-wider">Current Location</div>
+                  <div class="text-xs sm:text-sm font-bold text-white">House: KHA-33/4/P-1, Beparipara, Khilkhet</div>
+                  <div class="text-xs text-slate-400">Dhaka, Bangladesh 1229</div>
+                </div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 text-lg shrink-0">
+                  <i class="fa-solid fa-envelope"></i>
+                </div>
+                <div>
+                  <div class="text-[10px] text-slate-400 uppercase tracking-wider">Email Address</div>
+                  <a href="mailto:shuvomozumder101@gmail.com" class="text-xs sm:text-sm font-bold text-white hover:text-cyan-400">
+                    shuvomozumder101@gmail.com
+                  </a>
+                </div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl flex items-center gap-4">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg shrink-0">
+                  <i class="fa-solid fa-phone"></i>
+                </div>
+                <div>
+                  <div class="text-[10px] text-slate-400 uppercase tracking-wider">Phone Lines</div>
+                  <div class="text-xs sm:text-sm font-bold text-white font-mono">+8801640703380 / +8801532441002</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Notice about Moon Satellite -->
+            <div class="p-4 rounded-xl bg-slate-900/90 border border-blue-500/30 text-xs text-slate-300 flex items-center justify-between">
+              <span class="flex items-center gap-2">
+                <i class="fa-solid fa-moon text-amber-300"></i>
+                <span>Earth's satellite <strong>The Moon</strong> holds Work Experience!</span>
+              </span>
+              <button onclick="selectCelestialBody('moon')" class="px-3 py-1 rounded-lg bg-blue-500/20 text-blue-300 font-bold hover:bg-blue-500/40">
+                Fly to Moon
+              </button>
+            </div>
+          </div>
+        `
+      },
+
+      moon: {
+        badge: "🌙 Earth Satellite • Experience",
+        title: "Work Experience & Progression",
+        subtitle: "4+ Years Professional Experience",
+        color: "text-slate-200",
+        bgBadge: "bg-slate-500/10 text-slate-200 border-slate-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-briefcase text-xs"></i> Moon Orbit • 4+ Years Experience
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Professional Work History
+            </h2>
+
+            <div class="relative border-l-2 border-slate-800 ml-2 space-y-6">
+              
+              <!-- Role 1: Software Engineer -->
+              <div class="relative pl-6">
+                <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-cyan-400 ring-4 ring-slate-950"></div>
+                <div class="glass-card p-5 rounded-2xl">
+                  <div class="flex flex-wrap items-center justify-between gap-1 mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-mono font-bold">1st Role • Current</span>
+                    <span class="text-xs text-cyan-400 font-bold">Dec 05, 2021 – Present</span>
+                  </div>
+                  <h3 class="text-lg font-bold text-white">Software Developer (.NET)</h3>
+                  <div class="text-xs text-slate-400 font-semibold">Singularity Ltd. • Tejgaon I/A, Dhaka</div>
+                  
+                  <ul class="mt-3 space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                    <li>R&D and deployment of innovative ASP.NET Core web applications.</li>
+                    <li>Designing microservice architectures and high-performance RESTful APIs.</li>
+                    <li>Code refactoring, database query tuning, and Chart.js reporting dashboards.</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Role 2: Jr. Software Engineer -->
+              <div class="relative pl-6">
+                <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-indigo-500 ring-4 ring-slate-950"></div>
+                <div class="glass-card p-5 rounded-2xl">
+                  <div class="flex flex-wrap items-center justify-between gap-1 mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-mono font-bold">2nd Role</span>
+                    <span class="text-xs text-slate-400">Mid-Career Phase</span>
+                  </div>
+                  <h3 class="text-lg font-bold text-white">Jr. Software Engineer</h3>
+                  <div class="text-xs text-slate-400 font-semibold">Singularity Ltd. • Dhaka</div>
+                  
+                  <ul class="mt-3 space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                    <li>Developed feature modules, SQL Server procedures, and API endpoints.</li>
+                    <li>Engineered automated communication gateways (HBL Email & SMS).</li>
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Role 3: Intern Developer -->
+              <div class="relative pl-6">
+                <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-slate-600 ring-4 ring-slate-950"></div>
+                <div class="glass-card p-5 rounded-2xl">
+                  <div class="flex flex-wrap items-center justify-between gap-1 mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-mono font-bold">3rd Role</span>
+                    <span class="text-xs text-slate-400">Sep 05, 2021 – Dec 05, 2021</span>
+                  </div>
+                  <h3 class="text-lg font-bold text-white">Intern Software Developer</h3>
+                  <div class="text-xs text-slate-400 font-semibold">Singularity Ltd. • Baridhara DOHS, Dhaka</div>
+                  
+                  <ul class="mt-3 space-y-1.5 text-xs text-slate-300 list-disc list-inside">
+                    <li>RDLC dynamic report creation with PDF and print exports.</li>
+                    <li>Excel data export pipeline integration with custom column freezing.</li>
+                  </ul>
+                </div>
+              </div>
+
+            </div>
+
+            <button onclick="selectCelestialBody('mars')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-2">
+              <span>Next Planet: Mars Projects Showcase</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        `
+      },
+
+      mars: {
+        badge: "♂ Planet 4 • Projects Showcase",
+        title: "Enterprise & Personal Projects",
+        subtitle: "3 Professional Enterprise + Personal Solutions",
+        color: "text-red-400",
+        bgBadge: "bg-red-500/10 text-red-400 border-red-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-red-950/80 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-diagram-project text-xs"></i> Mars Orbit • Projects Showcase
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Featured Software Systems
+            </h2>
+
+            <!-- 3 Core Enterprise Systems -->
+            <div class="space-y-4">
+              <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">3 Professional Enterprise Projects</h3>
+              
+              <div class="glass-card p-5 rounded-2xl flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 text-[10px] font-bold">1. BAT Bangladesh</span>
+                    <span class="text-[10px] font-mono text-slate-400">v.01 - v.03</span>
+                  </div>
+                  <h4 class="text-base font-bold text-white">AURA QAD System</h4>
+                  <p class="text-xs text-slate-300 mt-1">Decision support & manufacturing quality analytics using ASP.NET Core, MSSQL, Oracle, Chart.js.</p>
+                </div>
+                <button onclick="openProjectModal('aura')" class="mt-3 text-xs text-cyan-400 font-bold flex items-center gap-1 self-start">
+                  View Details <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+              </div>
+
+              <div class="glass-card p-5 rounded-2xl flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-purple-500/10 text-purple-400 text-[10px] font-bold">2. Dhaka Chamber (DCCI)</span>
+                    <span class="text-[10px] font-mono text-slate-400">Enterprise ERP</span>
+                  </div>
+                  <h4 class="text-base font-bold text-white">DCCI ERP System</h4>
+                  <p class="text-xs text-slate-300 mt-1">Enterprise Resource Planning handling membership, dynamic billing, document verification, and chamber workflows.</p>
+                </div>
+                <button onclick="openProjectModal('dcci')" class="mt-3 text-xs text-purple-400 font-bold flex items-center gap-1 self-start">
+                  View Details <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+              </div>
+
+              <div class="glass-card p-5 rounded-2xl flex flex-col justify-between">
+                <div>
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 text-[10px] font-bold">3. Heidelberg Automation</span>
+                    <span class="text-[10px] font-mono text-slate-400">SMS Gateway</span>
+                  </div>
+                  <h4 class="text-base font-bold text-white">HBL Email & SMS System</h4>
+                  <p class="text-xs text-slate-300 mt-1">Automated email-to-SMS gateway converting email body payloads into SMS messages with logging.</p>
+                </div>
+                <button onclick="openProjectModal('hbl')" class="mt-3 text-xs text-indigo-400 font-bold flex items-center gap-1 self-start">
+                  View Details <i class="fa-solid fa-chevron-right text-[10px]"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Personal Portfolio Projects -->
+            <div class="space-y-3 pt-2">
+              <h3 class="text-xs font-bold text-emerald-400 uppercase tracking-wider">Personal Portfolio Applications</h3>
+              
+              <div class="glass-card p-4 rounded-xl flex justify-between items-center">
+                <div>
+                  <h4 class="text-xs font-bold text-white">Online Digital Wallet (SignalR)</h4>
+                  <p class="text-[11px] text-slate-400">Real-time WebSockets, visiting card generator, posts.</p>
+                </div>
+                <button onclick="openProjectModal('wallet')" class="text-xs text-emerald-400 font-bold">Details</button>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl flex justify-between items-center">
+                <div>
+                  <h4 class="text-xs font-bold text-white">Job Portal & Ticket Management</h4>
+                  <p class="text-[11px] text-slate-400">Full-stack recruitment portal & seat booking system.</p>
+                </div>
+                <button onclick="openProjectModal('job_ticket')" class="text-xs text-amber-400 font-bold">Details</button>
+              </div>
+            </div>
+
+            <button onclick="selectCelestialBody('jupiter')" class="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-red-400 font-bold text-xs uppercase tracking-wider border border-slate-700 transition-colors flex items-center justify-center gap-2">
+              <span>Next Planet: Jupiter Contact & Education</span>
+              <i class="fa-solid fa-arrow-right"></i>
+            </button>
+          </div>
+        `
+      },
+
+      jupiter: {
+        badge: "♃ Planet 5 • Contact & Edu",
+        title: "Contact, Education & References",
+        subtitle: "Academic Qualifications & Official Contact",
+        color: "text-purple-400",
+        bgBadge: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+        render: () => `
+          <div class="space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-purple-950/80 border border-purple-500/30 text-purple-400 text-xs font-semibold uppercase tracking-wider">
+              <i class="fa-solid fa-graduation-cap text-xs"></i> Jupiter Orbit • Education & Contact
+            </div>
+
+            <h2 class="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Academic Record & References
+            </h2>
+
+            <!-- Education -->
+            <div class="space-y-3">
+              <h3 class="text-xs font-bold text-purple-400 uppercase tracking-wider">Academic Background</h3>
+
+              <div class="glass-card p-4 rounded-xl relative">
+                <span class="text-[10px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-full absolute top-4 right-4">Jan 2021</span>
+                <h4 class="text-sm font-bold text-white pr-16">B.Sc. in Software Engineering</h4>
+                <div class="text-xs text-slate-300">Daffodil International University (DIU)</div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl relative">
+                <span class="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full absolute top-4 right-4">June 2015</span>
+                <h4 class="text-xs font-bold text-white pr-16">Higher Secondary Certificate (HSC)</h4>
+                <div class="text-xs text-slate-300">Badsha Mia Ideal High School • GPA: 4.00/5.00</div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl relative">
+                <span class="text-[10px] font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full absolute top-4 right-4">Feb 2013</span>
+                <h4 class="text-xs font-bold text-white pr-16">Secondary School Certificate (SSC)</h4>
+                <div class="text-xs text-slate-300">Badsha Mia Ideal High School • GPA: 4.75/5.00</div>
+              </div>
+            </div>
+
+            <!-- References -->
+            <div class="space-y-3 pt-2">
+              <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Professional References</h3>
+
+              <div class="glass-card p-4 rounded-xl">
+                <div class="text-xs font-bold text-white">Mr. Ratish Chandra Sen</div>
+                <div class="text-[11px] text-cyan-400 font-semibold">Sr. Engineer • Education Engineering Dept.</div>
+                <div class="text-[11px] text-slate-400 font-mono mt-1">Phone: 01711831082 | ratishsen@yahoo.com</div>
+              </div>
+
+              <div class="glass-card p-4 rounded-xl">
+                <div class="text-xs font-bold text-white">Ms. Nusrat Jahan</div>
+                <div class="text-[11px] text-indigo-400 font-semibold">Lecturer (Senior Scale) • Dept. of Software Engineering, DIU</div>
+                <div class="text-[11px] text-slate-400 font-mono mt-1">Email: nusrat.swe@diu.edu.bd</div>
+              </div>
+            </div>
+
+            <!-- Contact Form -->
+            <div class="glass-card p-5 rounded-2xl space-y-3">
+              <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wider">Send Direct Message</h3>
+              <form id="contact-form" onsubmit="handleFormSubmit(event)" class="space-y-3">
+                <input type="text" required placeholder="Your Name" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500">
+                <input type="email" required placeholder="Your Email" class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500">
+                <textarea rows="3" required placeholder="Your Message..." class="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-cyan-500 resize-none"></textarea>
+                <button type="submit" id="submit-btn" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:opacity-95 text-white font-bold text-xs shadow-lg">
+                  Send Message
+                </button>
+                <div id="form-message" class="hidden text-center text-xs font-bold text-cyan-400 pt-1">
+                  Message sent successfully!
+                </div>
+              </form>
+            </div>
+          </div>
+        `
+      }
+    };
+
+    /* Project Modal Content Data */
+    const projectDetails = {
+      aura: {
+        title: 'AURA QAD (BAT Bangladesh)',
+        version: 'Enterprise System • Versions: V.01, V.02, V.03',
+        tech: ['ASP.NET Core MVC', 'MSSQL', 'Oracle', 'JavaScript', 'jQuery', 'Ajax', 'Chart.js'],
+        description: `
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+            AURA is an enterprise Quality Assurance & Decision Support platform constructed for BAT Bangladesh. The system's primary objective is to enhance decision-making and strategic planning within manufacturing processes by providing real-time insights and comprehensive data analysis.
+          </p>
+          <h4 class="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">Key Engineering Responsibilities:</h4>
+          <ul class="list-disc list-inside text-xs text-slate-300 space-y-1 mb-4">
+            <li>Researched, developed, and deployed innovative ASP.NET Core web application modules supporting experimental R&D projects.</li>
+            <li>Architected dynamic multi-input forms and automated pipeline workflows.</li>
+            <li>Implemented real-time visual analytics dashboards using Chart.js & Ajax polling.</li>
+            <li>Performed deep code refactoring across legacy backend models to reduce DB query latency.</li>
+          </ul>
+        `
+      },
+      dcci: {
+        title: 'DCCI ERP System (Dhaka Chamber)',
+        version: 'Enterprise ERP System',
+        tech: ['ASP.NET Core MVC', 'MSSQL Server', 'Entity Framework Core', 'RESTful APIs', 'Bootstrap'],
+        description: `
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+            Comprehensive Enterprise Resource Planning system constructed for the Dhaka Chamber of Commerce & Industry (DCCI). Handles high-volume administrative tasks, membership verification, dynamic billing services, certificate issuance, and departmental workflow automation.
+          </p>
+          <h4 class="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Key Engineering Responsibilities:</h4>
+          <ul class="list-disc list-inside text-xs text-slate-300 space-y-1 mb-4">
+            <li>Designed secure role-based authentication and authorization modules.</li>
+            <li>Engineered database architecture, stored procedures, and complex reporting pipelines in SQL Server.</li>
+            <li>Developed RESTful API endpoints for seamless multi-module integration across chamber divisions.</li>
+          </ul>
+        `
+      },
+      hbl: {
+        title: 'HBL Heidelberg Email & SMS System',
+        version: 'Enterprise Notification System',
+        tech: ['ASP.NET Core MVC', 'MSSQL Server', 'JavaScript', 'jQuery', 'SMS Gateway API'],
+        description: `
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+            Designed to modernize Heidelberg's automated notification infrastructure. The web service captures incoming emails sent with embedded destination phone numbers, converts the email body into structured SMS format, and routes message payloads to SMS gateways.
+          </p>
+          <h4 class="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Key Engineering Highlights:</h4>
+          <ul class="list-disc list-inside text-xs text-slate-300 space-y-1 mb-4">
+            <li>Developed and optimized scalable web applications using ASP.NET Core and SQL Server.</li>
+            <li>Contributed to technology research, API integration, and cloud deployment.</li>
+            <li>Integrated retry mechanisms and robust database logging for high-volume notification traffic.</li>
+          </ul>
+        `
+      },
+      wallet: {
+        title: 'Online Digital Wallet Platform',
+        version: 'Personal / Portfolio Project',
+        tech: ['ASP.NET Core MVC', 'MSSQL Server', 'SignalR', 'JavaScript', 'jQuery'],
+        description: `
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+            A real-time portfolio and digital contact ecosystem. Users create user profiles, search and connect with contacts, send instant messages in real time via SignalR WebSockets, publish posts, and automatically generate virtual digital visiting cards.
+          </p>
+        `
+      },
+      job_ticket: {
+        title: 'Online Job Portal & Ticket Management System',
+        version: 'Personal / Portfolio Projects',
+        tech: ['ASP.NET Core MVC', 'MSSQL Server', 'JavaScript', 'jQuery'],
+        description: `
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed mb-4">
+            Full-stack recruitment and automated ticket booking systems built with ASP.NET Core MVC and SQL Server.
+          </p>
+        `
+      }
+    };
+
+    function openProjectModal(key) {
+      const data = projectDetails[key];
+      if (!data) return;
+      const content = document.getElementById('modal-content');
+      
+      let techBadges = data.tech.map(t => `<span class="px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-800 text-cyan-300 border border-slate-700">${t}</span>`).join(' ');
+
+      content.innerHTML = `
+        <h3 class="text-xl sm:text-2xl font-bold text-white mb-1 pr-6">${data.title}</h3>
+        ${data.version ? `<div class="text-xs font-mono text-cyan-400 mb-3">${data.version}</div>` : '<div class="mb-3"></div>'}
+        <div class="mb-5">${data.description}</div>
+        <div class="border-t border-slate-800/80 pt-3">
+          <div class="text-[10px] text-slate-400 font-bold tracking-wider uppercase mb-2">TECH STACK</div>
+          <div class="flex flex-wrap gap-1.5">${techBadges}</div>
+        </div>
+      `;
+      document.getElementById('project-modal').classList.remove('hidden');
+    }
+
+    function closeProjectModal() {
+      document.getElementById('project-modal').classList.add('hidden');
+    }
+
+    function toggleMobileMenu() {
+      document.getElementById('mobile-menu').classList.toggle('hidden');
+    }
+
+    document.getElementById('mobile-menu-btn').addEventListener('click', toggleMobileMenu);
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const msg = document.getElementById('form-message');
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin mr-2"></i> Transmitting...';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        btn.innerHTML = 'Send Message';
+        btn.disabled = false;
+        msg.classList.remove('hidden');
+        e.target.reset();
+        setTimeout(() => msg.classList.add('hidden'), 4000);
+      }, 1200);
+    }
+
+    function handleTerminalCommand(e) {
+      e.preventDefault();
+      const input = document.getElementById('terminal-input');
+      const output = document.getElementById('terminal-output');
+      if (!input || !output) return;
+
+      const cmd = input.value.trim().toLowerCase();
+      if (!cmd) return;
+
+      const newLine = document.createElement('div');
+      newLine.innerHTML = `<span class="text-amber-400">$ ${cmd}</span>`;
+      output.appendChild(newLine);
+
+      let responseText = '';
+      if (cmd === 'help') {
+        responseText = 'Commands: <b>skills</b> (Venus), <b>projects</b> (Mars), <b>experience</b> (Moon), <b>contact</b> (Jupiter), <b>clear</b>';
+      } else if (cmd === 'skills') {
+        selectCelestialBody('venus');
+        responseText = 'Warping to Venus (Skills)...';
+      } else if (cmd === 'projects') {
+        selectCelestialBody('mars');
+        responseText = 'Warping to Mars (Projects)...';
+      } else if (cmd === 'experience') {
+        selectCelestialBody('moon');
+        responseText = 'Warping to Moon (Experience)...';
+      } else if (cmd === 'contact') {
+        selectCelestialBody('jupiter');
+        responseText = 'Warping to Jupiter (Contact)...';
+      } else if (cmd === 'clear') {
+        output.innerHTML = '';
+        input.value = '';
+        return;
+      } else {
+        responseText = `Command not recognized: '${cmd}'. Type 'help'.`;
+      }
+
+      const resLine = document.createElement('div');
+      resLine.className = 'text-slate-400 pl-2 border-l border-amber-500/50';
+      resLine.innerHTML = responseText;
+      output.appendChild(resLine);
+
+      output.scrollTop = output.scrollHeight;
+      input.value = '';
+    }
+
+    /* =========================================================
+       2. THREE.JS SOLAR SYSTEM 3D ENVIRONMENT
+       ========================================================= */
+    let scene, camera, renderer, controls;
+    let celestialBodies = [];
+    let interactableMeshes = [];
+    let selectedBody = null;
+    let isTransitioning = false;
+    let targetCamPos = new THREE.Vector3();
+    let targetLookAt = new THREE.Vector3();
+
+    const initialCameraPos = new THREE.Vector3(0, 32, 55);
+
+    // Planet Specs [id, name, radius, orbitDistance, color, speed]
+    const celestialSpecs = [
+      { id: 'sun',     name: '☀️ Sun',      role: 'Home',      r: 4.2, dist: 0,  color: 0xfbbf24, emissive: 0xfbbf24, speed: 0 },
+      { id: 'mercury', name: '☿ Mercury',  role: 'About',     r: 0.8, dist: 9,  color: 0x94a3b8, speed: 0.015 },
+      { id: 'venus',   name: '♀ Venus',    role: 'Skills',    r: 1.2, dist: 14, color: 0xf59e0b, speed: 0.011 },
+      { id: 'earth',   name: '🌍 Earth',    role: 'Profile',   r: 1.4, dist: 20, color: 0x3b82f6, speed: 0.008 },
+      { id: 'mars',    name: '♂ Mars',     role: 'Projects',  r: 1.1, dist: 28, color: 0xef4444, speed: 0.006 },
+      { id: 'jupiter', name: '♃ Jupiter',  role: 'Contact',   r: 2.3, dist: 37, color: 0xa855f7, speed: 0.004 }
+    ];
+
+    window.onload = function () {
+      initSolarSystem();
+      animate();
+    };
+
+    function initSolarSystem() {
+      const container = document.getElementById('webgl-container');
+      const labelsOverlay = document.getElementById('planet-labels-overlay');
+
+      // Scene
+      scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x030712, 0.008);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.copy(initialCameraPos);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      // Controls
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0x404040, 1.2);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.PointLight(0xffffff, 2.5, 200);
+      scene.add(sunLight);
+
+      // Starfield Background
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 2500;
+      const starPositions = new Float32Array(starCount * 3);
+      for(let i = 0; i < starCount * 3; i++) {
+        starPositions[i] = (Math.random() - 0.5) * 400;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.55, transparent: true, opacity: 0.8 });
+      const starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
+
+      // Build Celestial Objects
+      celestialSpecs.forEach(spec => {
+        // Orbit Ring Line
+        if (spec.dist > 0) {
+          const ringGeo = new THREE.RingGeometry(spec.dist - 0.06, spec.dist + 0.06, 128);
+          const ringMat = new THREE.MeshBasicMaterial({ color: 0x334155, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+          const ring = new THREE.Mesh(ringGeo, ringMat);
+          ring.rotation.x = Math.PI / 2;
+          scene.add(ring);
+        }
+
+        const pivot = new THREE.Group();
+        scene.add(pivot);
+
+        const geo = new THREE.SphereGeometry(spec.r, 32, 32);
+        const mat = new THREE.MeshStandardMaterial({
+          color: spec.color,
+          emissive: spec.emissive || 0x000000,
+          roughness: 0.6,
+          metalness: 0.2
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.x = spec.dist;
+        mesh.userData = { id: spec.id, name: spec.name };
+        pivot.add(mesh);
+
+        // Add 3D DOM Badge Label
+        const badgeEl = document.createElement('div');
+        badgeEl.className = 'planet-badge';
+        badgeEl.innerHTML = `${spec.name} <span class="text-[10px] opacity-75">(${spec.role})</span>`;
+        badgeEl.onclick = () => selectCelestialBody(spec.id);
+        labelsOverlay.appendChild(badgeEl);
+
+        celestialBodies.push({
+          id: spec.id,
+          pivot: pivot,
+          mesh: mesh,
+          speed: spec.speed,
+          el: badgeEl,
+          radius: spec.r
+        });
+
+        interactableMeshes.push(mesh);
+
+        // Add Moon Satellite to Earth
+        if (spec.id === 'earth') {
+          const moonPivot = new THREE.Group();
+          mesh.add(moonPivot);
+
+          const moonGeo = new THREE.SphereGeometry(0.45, 16, 16);
+          const moonMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 0.8 });
+          const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+          moonMesh.position.x = 2.8;
+          moonMesh.userData = { id: 'moon', name: '🌙 Moon' };
+          moonPivot.add(moonMesh);
+
+          const moonBadgeEl = document.createElement('div');
+          moonBadgeEl.className = 'planet-badge';
+          moonBadgeEl.innerHTML = `🌙 Moon <span class="text-[10px] opacity-75">(Experience)</span>`;
+          moonBadgeEl.onclick = () => selectCelestialBody('moon');
+          labelsOverlay.appendChild(moonBadgeEl);
+
+          celestialBodies.push({
+            id: 'moon',
+            pivot: moonPivot,
+            mesh: moonMesh,
+            speed: 0.025,
+            el: moonBadgeEl,
+            radius: 0.45
+          });
+
+          interactableMeshes.push(moonMesh);
+        }
+      });
+
+      // Window Events
+      window.addEventListener('resize', onWindowResize);
+
+      // Raycaster Click Handler
+      const raycaster = new THREE.Raycaster();
+      const mouse = new THREE.Vector2();
+
+      window.addEventListener('click', (e) => {
+        if (e.target.closest('#info-drawer') || e.target.closest('#project-modal') || e.target.closest('header')) return;
+
+        mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(interactableMeshes);
+
+        if (intersects.length > 0) {
+          const clickedMesh = intersects[0].object;
+          if (clickedMesh.userData && clickedMesh.userData.id) {
+            selectCelestialBody(clickedMesh.userData.id);
+          }
+        }
+      });
+
+      document.getElementById('reset-orbit-btn').addEventListener('click', resetToOrbitView);
+      document.getElementById('close-drawer-btn').addEventListener('click', resetToOrbitView);
+    }
+
+    function selectCelestialBody(id) {
+      const bodyObj = celestialBodies.find(b => b.id === id);
+      if (!bodyObj) return;
+
+      selectedBody = bodyObj;
+      const data = portfolioPages[id];
+      if (!data) return;
+
+      // Render Drawer Page
+      const contentContainer = document.getElementById('drawer-content');
+      contentContainer.innerHTML = data.render();
+
+      // Highlight active badge
+      celestialBodies.forEach(b => {
+        if (b.el) b.el.classList.remove('active-target');
+      });
+      if (bodyObj.el) bodyObj.el.classList.add('active-target');
+
+      // Open side drawer
+      document.getElementById('info-drawer').classList.remove('translate-x-full');
+
+      isTransitioning = true;
+    }
+
+    function resetToOrbitView() {
+      selectedBody = null;
+      celestialBodies.forEach(b => {
+        if (b.el) b.el.classList.remove('active-target');
+      });
+
+      document.getElementById('info-drawer').classList.add('translate-x-full');
+
+      targetCamPos.copy(initialCameraPos);
+      targetLookAt.set(0, 0, 0);
+      isTransitioning = true;
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    // Update Floating Badges to 2D Screen Positions
+    function updatePlanetBadges() {
+      const tempVec = new THREE.Vector3();
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+
+      celestialBodies.forEach(b => {
+        if (!b.el) return;
+
+        tempVec.setFromMatrixPosition(b.mesh.matrixWorld);
+        tempVec.project(camera);
+
+        const x = (tempVec.x * halfW) + halfW;
+        const y = -(tempVec.y * halfH) + halfH;
+
+        if (tempVec.z < 1) {
+          b.el.style.transform = `translate(-50%, -100%) translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+          b.el.style.display = 'block';
+        } else {
+          b.el.style.display = 'none';
+        }
+      });
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Rotate planet orbits
+      celestialBodies.forEach(b => {
+        if (b.pivot) b.pivot.rotation.y += b.speed * 0.5;
+        if (b.mesh) b.mesh.rotation.y += 0.008;
+      });
+
+      // Target Camera Camera Tracking
+      if (selectedBody) {
+        const worldPos = new THREE.Vector3();
+        selectedBody.mesh.getWorldPosition(worldPos);
+
+        const r = selectedBody.radius || 1;
+        const offset = new THREE.Vector3(0, r * 2.2, r * 4.8);
+        
+        targetCamPos.copy(worldPos).add(offset);
+        targetLookAt.copy(worldPos);
+      }
+
+      if (isTransitioning || selectedBody) {
+        camera.position.lerp(targetCamPos, 0.05);
+        controls.target.lerp(targetLookAt, 0.05);
+        controls.update();
+
+        if (camera.position.distanceTo(targetCamPos) < 0.1) {
+          isTransitioning = false;
+        }
+      } else {
+        controls.update();
+      }
+
+      renderer.render(scene, camera);
+      updatePlanetBadges();
+    }
+  </script>
+</body>
+</html>
